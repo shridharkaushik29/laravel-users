@@ -1,0 +1,12 @@
+{
+    "name": "shridhar/laravel-users",
+    "description": "User Management of Laravel",
+    "type": "library",
+    "authors": [
+        {
+            "name": "shridharkaushik29",
+            "email": "shridharkaushik29@gmail.com"
+        }
+    ],
+    "require": {}
+}
