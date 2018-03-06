@@ -2,8 +2,7 @@
     "name": "shridharkaushik29/laravel-users",
     "description": "User Management of Laravel",
     "autoload": {
-        "classmap": [],
-        "psr-4": {
+        "psr-0": {
             "ShridharKaushik\\": "src/"
         }
     },
