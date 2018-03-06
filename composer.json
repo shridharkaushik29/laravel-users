@@ -1,6 +1,12 @@
 {
     "name": "shridharkaushik29/laravel-users",
     "description": "User Management of Laravel",
+    "autoload": {
+        "classmap": [],
+        "psr-4": {
+            "ShridharKaushik\\": "src/"
+        }
+    },
     "type": "library",
     "authors": [
         {
@@ -8,5 +14,12 @@
             "email": "shridharkaushik29@gmail.com"
         }
     ],
-    "require": {}
+    "require": {},
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ShridharKaushik\\LaravelUserServiceProvider"
+            ]
+        }
+    }
 }
