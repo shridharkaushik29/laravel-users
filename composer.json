@@ -1,6 +1,7 @@
 {
     "name": "shridharkaushik29/laravel-users",
     "description": "User Management of Laravel",
+    "license": "MIT",
     "autoload": {
         "psr-0": {
             "ShridharKaushik\\": "src/"
