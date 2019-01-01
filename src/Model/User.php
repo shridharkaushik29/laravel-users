@@ -20,25 +20,52 @@ use Exception;
  */
 abstract class User extends Model {
 
+    /**
+     * @var array
+     */
     protected $date = ["deleted_at"];
+    /**
+     * @var
+     */
+    /**
+     * @var
+     */
     protected static $token_class, $role_class;
+    /**
+     * @var string
+     */
+    /**
+     * @var string
+     */
     protected static $login_cookie_name = "login_token", $login_time = 86000;
+    /**
+     * @var array
+     */
     protected $hidden = ["password"];
 
+    /**
+     * User constructor.
+     * @param array $attributes
+     */
     public function __construct(array $attributes = array()) {
         parent::__construct($attributes);
         $this->append(["is_logged_in"]);
     }
 
+    /**
+     * @param array $config
+     * @return $this
+     */
     public function login($config = []) {
         $options = collect([
-                    "expiry" => static::$login_time,
-                ])->merge($config)->toArray();
+            "expiry" => static::$login_time,
+        ])->merge($config)->toArray();
 
         $cookie_name = array_get($options, "cookie_name");
 
         if ($this->loggedInUser($cookie_name)) {
             $token = static::getLoginToken($cookie_name);
+            $token->user()->associate($this);
             $token->unlock();
         } else {
             static::logout();
@@ -57,6 +84,13 @@ abstract class User extends Model {
         return $this;
     }
 
+    /**
+     * @param string $username
+     * @param string $password
+     * @param array $params
+     * @return mixed
+     * @throws Exception
+     */
     public static function loginUser($username, $password, $params = []) {
 
         if (empty($username) || empty($password)) {
@@ -76,46 +110,78 @@ abstract class User extends Model {
         return $user->login($params);
     }
 
+    /**
+     * @param $username
+     * @return mixed
+     */
     static function findByUsername($username) {
         return static::username($username)->first();
     }
 
+    /**
+     * @param $query
+     * @param $username
+     */
     function scopeUsername($query, $username) {
-        $query->where(function($query) use($username) {
+        $query->where(function ($query) use ($username) {
             $query->orWhere("username", $username);
             $query->orWhere("email", $username);
             $query->orWhere("mobile", $username);
         });
     }
 
+    /**
+     * @param $password
+     * @return bool
+     */
     function match_password($password) {
         return Password::match($password, $this->password);
     }
 
+    /**
+     * @return mixed
+     */
     public function password() {
         return app()->makeWith(Password::class, [
-                    "user" => $this
+            "user" => $this
         ]);
     }
 
+    /**
+     * @param $value
+     * @return string
+     */
     public function setPasswordAttribute($value) {
         return $this->attributes['password'] = Password::hash($value);
     }
 
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
     public function role() {
         return $this->belongsTo(static::$role_class);
     }
 
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
     function tokens() {
         return $this->hasMany(static::$token_class);
     }
 
+    /**
+     * @param $role
+     * @return bool
+     */
     public function hasRole($role) {
         if ($this->role && $this->role->slug === $role) {
             return true;
         }
     }
 
+    /**
+     * @return bool
+     */
     public function getIsLoggedInAttribute() {
         $user = static::loggedInUser();
         if ($user && $user->id === $this->id) {
@@ -125,12 +191,19 @@ abstract class User extends Model {
         }
     }
 
+    /**
+     * @param $query
+     * @param string $slug
+     */
     public function scopeRole($query, $slug) {
-        $query->whereHas("role", function($query) use($slug) {
+        $query->whereHas("role", function ($query) use ($slug) {
             $query->where("slug", $slug);
         });
     }
 
+    /**
+     * @param string $slug
+     */
     public function setRoleAttribute($slug) {
         $role = call_user_func([static::$role_class, "findWithSlug"], $slug);
         if ($role) {
@@ -138,6 +211,10 @@ abstract class User extends Model {
         }
     }
 
+    /**
+     * @param string|null $cookie_name
+     * @return bool
+     */
     public static function logout($cookie_name = null) {
         $token = static::getLoginToken($cookie_name);
         if ($token) {
@@ -147,6 +224,10 @@ abstract class User extends Model {
         return true;
     }
 
+    /**
+     * @param string|null $cookie_name
+     * @return bool
+     */
     public static function lock($cookie_name = null) {
         $token = static::getLoginToken($cookie_name);
         if ($token) {
@@ -155,6 +236,10 @@ abstract class User extends Model {
         return true;
     }
 
+    /**
+     * @param null $cookie_name
+     * @return mixed
+     */
     public static function loggedInUser($cookie_name = null) {
         $token = static::getLoginToken($cookie_name);
         if ($token) {
@@ -162,6 +247,10 @@ abstract class User extends Model {
         }
     }
 
+    /**
+     * @param null $cookie_name
+     * @return bool
+     */
     public static function isLoggedIn($cookie_name = null) {
         $token = static::getLoginToken($cookie_name);
         if ($token && !$token->is_locked()) {
@@ -169,6 +258,10 @@ abstract class User extends Model {
         }
     }
 
+    /**
+     * @param null $cookie_name
+     * @return mixed
+     */
     public static function getLoginToken($cookie_name = null) {
         $id = Cookie::get($cookie_name ?: static::$login_cookie_name);
         $token = call_user_func([static::$token_class, "where"], "id", $id)->type("login")->first();
@@ -177,12 +270,21 @@ abstract class User extends Model {
         }
     }
 
+    /**
+     * @param $token
+     * @param string|null $cookie_name
+     * @return bool
+     */
     public static function setLoginToken($token, $cookie_name = null) {
         $cookie = Cookie::forever($cookie_name ?: static::$login_cookie_name, $token->id);
         Cookie::queue($cookie);
         return true;
     }
 
+    /**
+     * @param string|null $cookie_name
+     * @return bool
+     */
     public static function removeLoginToken($cookie_name = null) {
         Cookie::queue(Cookie::forget($cookie_name ?: static::$login_cookie_name));
         return true;
