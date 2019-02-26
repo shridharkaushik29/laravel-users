@@ -1,27 +1,27 @@
 {
-    "name": "shridharkaushik29/laravel-users",
-    "description": "User Management of Laravel",
-    "license": "MIT",
-    "autoload": {
-        "psr-0": {
-            "Shridhar\\Users\\": "src/"
-        }
-    },
-    "type": "library",
-    "authors": [
-        {
-            "name": "shridharkaushik29",
-            "email": "shridharkaushik29@gmail.com"
-        }
-    ],
-    "require": {
-        "php": ">=5.5"
-    },
-    "extra": {
-        "laravel": {
-            "providers": [
-                "Shridhar\\Users\\Provider"
-            ]
-        }
+  "name": "shridharkaushik29/laravel-users",
+  "description": "User Management of Laravel",
+  "license": "MIT",
+  "autoload": {
+    "psr-0": {
+      "Shridhar\\Users\\": "src/"
     }
+  },
+  "type": "library",
+  "authors": [
+    {
+      "name": "shridharkaushik29",
+      "email": "shridharkaushik29@gmail.com"
+    }
+  ],
+  "require": {
+    "laravel/framework": "5.4.*"
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Shridhar\\Users\\Provider"
+      ]
+    }
+  }
 }

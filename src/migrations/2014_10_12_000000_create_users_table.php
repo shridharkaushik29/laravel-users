@@ -30,10 +30,9 @@ class CreateUsersTable extends Migration {
             $table->string("mobile", 10)->nullable()->unique();
             $table->string("password", 60)->nullable();
             $table->timestamps();
-            $table->softDeletes();
         });
 
-        Schema::create("user_tokens", function(Blueprint $table) {
+        Schema::create("user_tokens", function (Blueprint $table) {
             $table->bigIncrements("id");
             $table->bigInteger("user_id")->nullable()->unsigned();
             $table->string("type")->nullable();
@@ -44,8 +43,6 @@ class CreateUsersTable extends Migration {
             $table->text("user_agent")->nullable();
             $table->text("meta")->nullable();
             $table->timestamps();
-            $table->softDeletes();
-//            $table->index("user_id");
             $table->foreign("user_id")->references("id")->on("users")->onUpdate('cascade')->onDelete('cascade');
         });
     }

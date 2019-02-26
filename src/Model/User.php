@@ -8,22 +8,32 @@
 
 namespace Shridhar\Users\Model;
 
-use Shridhar\Users\Facades\Password;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\Hash;
 use Exception;
 
 /**
  * Description of User
  *
+ * @property int id
+ * @property string password
+ * @property Collection tokens
+ * @property int role_id
+ * @property Role role
+ * @property Carbon created_at
+ * @property Carbon updated_at
  * @author Shridhar
  */
 abstract class User extends Model {
 
-    /**
-     * @var array
-     */
-    protected $date = ["deleted_at"];
+    protected $appends = ["is_logged_in", "is_locked"];
     /**
      * @var
      */
@@ -44,43 +54,31 @@ abstract class User extends Model {
     protected $hidden = ["password"];
 
     /**
-     * User constructor.
-     * @param array $attributes
-     */
-    public function __construct(array $attributes = array()) {
-        parent::__construct($attributes);
-        $this->append(["is_logged_in"]);
-    }
-
-    /**
      * @param array $config
      * @return $this
      */
     public function login($config = []) {
         $options = collect([
-            "expiry" => static::$login_time,
+            "login_time" => static::$login_time,
         ])->merge($config)->toArray();
 
         $cookie_name = array_get($options, "cookie_name");
+        $login_time = array_get($options, "login_time");
 
-        if ($this->loggedInUser($cookie_name)) {
-            $token = static::getLoginToken($cookie_name);
-            $token->user()->associate($this);
-            $token->unlock();
-        } else {
-            static::logout();
-            $token = $this->tokens()->make();
-        }
-        $expiry = array_get($options, "expiry");
+        /** @var UserToken $token */
+        $token = static::getLoginToken($cookie_name) ?: $token = $this->tokens()->make();
 
         $token->ip_address = array_get($options, "ip_address");
         $token->user_agent = array_get($options, "user_agent");
-        $token->expiry = date("Y-m-d H:i:s", time() + $expiry);
-        $token->type = "login";
+        $token->expiry = Carbon::now()->addSeconds($login_time);
+        $token->type = UserToken::LoginType;
+        $token->user()->associate($this);
+        $token->unlock();
         $token->touch_last_seen();
         $token->save();
 
         static::setLoginToken($token, $cookie_name);
+
         return $this;
     }
 
@@ -97,13 +95,14 @@ abstract class User extends Model {
             throw new Exception("Please enter username and password");
         }
 
-        $user = static::query()->username($username)->first();
+        /** @var User $user */
+        $user = static::query()->where("username", $username)->first();
 
         if (!$user) {
             throw new Exception("User account not found");
         }
 
-        if (!Password::match($password, $user->password)) {
+        if (!$user->match_password($password)) {
             throw new Exception("Invalid Password");
         }
 
@@ -115,11 +114,11 @@ abstract class User extends Model {
      * @return mixed
      */
     static function findByUsername($username) {
-        return static::username($username)->first();
+        return static::query()->username($username)->first();
     }
 
     /**
-     * @param $query
+     * @param Builder $query
      * @param $username
      */
     function scopeUsername($query, $username) {
@@ -131,42 +130,48 @@ abstract class User extends Model {
     }
 
     /**
-     * @param $password
+     * @param string $password
      * @return bool
      */
     function match_password($password) {
-        return Password::match($password, $this->password);
+        return Hash::check($password, $this->password);
     }
 
     /**
-     * @return mixed
+     * @param string $password
+     * @return string
      */
-    public function password() {
-        return app()->makeWith(Password::class, [
-            "user" => $this
-        ]);
+    function hash_password($password) {
+        return Hash::make($password);
     }
 
     /**
-     * @param $value
+     * @param string $value
      * @return string
      */
     public function setPasswordAttribute($value) {
-        return $this->attributes['password'] = Password::hash($value);
+        return $this->attributes['password'] = $this->hash_password($value);
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo
      */
     public function role() {
         return $this->belongsTo(static::$role_class);
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany
      */
     function tokens() {
         return $this->hasMany(static::$token_class);
+    }
+
+    /**
+     * @return HasOne
+     */
+    function login_token() {
+        return $this->hasOne(static::$token_class)->where("type", UserToken::LoginType);
     }
 
     /**
@@ -184,19 +189,23 @@ abstract class User extends Model {
      */
     public function getIsLoggedInAttribute() {
         $user = static::loggedInUser();
-        if ($user && $user->id === $this->id) {
-            return true;
-        } else {
-            return false;
-        }
+        return $user && $user->id === $this->id ? true : false;
     }
 
     /**
-     * @param $query
+     * @return bool
+     */
+    public function getIsLockedAttribute() {
+        $token = static::getLoginToken();
+        return $token && $token->user_id === $this->id && $token->is_locked ? true : false;
+    }
+
+    /**
+     * @param Builder $query
      * @param string $slug
      */
-    public function scopeRole($query, $slug) {
-        $query->whereHas("role", function ($query) use ($slug) {
+    public function scopeRole($query, string $slug) {
+        $query->whereHas("role", function (Builder $query) use ($slug) {
             $query->where("slug", $slug);
         });
     }
@@ -204,7 +213,8 @@ abstract class User extends Model {
     /**
      * @param string $slug
      */
-    public function setRoleAttribute($slug) {
+    public function setRoleAttribute(string $slug) {
+        /** @var Role $role */
         $role = call_user_func([static::$role_class, "findWithSlug"], $slug);
         if ($role) {
             $this->role_id = $role->id;
@@ -214,13 +224,10 @@ abstract class User extends Model {
     /**
      * @param string|null $cookie_name
      * @return bool
+     * @throws Exception
      */
     public static function logout($cookie_name = null) {
-        $token = static::getLoginToken($cookie_name);
-        if ($token) {
-            static::removeLoginToken($cookie_name);
-            $token->forceDelete();
-        }
+        self::removeLoginToken($cookie_name);
         return true;
     }
 
@@ -229,7 +236,7 @@ abstract class User extends Model {
      * @return bool
      */
     public static function lock($cookie_name = null) {
-        $token = static::getLoginToken($cookie_name);
+        $token = static::getLoginToken($cookie_name ?: static::$login_cookie_name);
         if ($token) {
             $token->lock();
         }
@@ -238,9 +245,20 @@ abstract class User extends Model {
 
     /**
      * @param null $cookie_name
-     * @return mixed
+     * @return User
      */
     public static function loggedInUser($cookie_name = null) {
+        $token = static::getLoginToken($cookie_name);
+        if ($token && !$token->is_locked) {
+            return $token->user;
+        }
+    }
+
+    /**
+     * @param null $cookie_name
+     * @return User
+     */
+    public static function currentUser($cookie_name = null) {
         $token = static::getLoginToken($cookie_name);
         if ($token) {
             return $token->user;
@@ -253,39 +271,41 @@ abstract class User extends Model {
      */
     public static function isLoggedIn($cookie_name = null) {
         $token = static::getLoginToken($cookie_name);
-        if ($token && !$token->is_locked()) {
-            return true;
-        }
+        return $token && !$token->is_locked ? true : false;
     }
 
     /**
      * @param null $cookie_name
-     * @return mixed
+     * @return UserToken
      */
     public static function getLoginToken($cookie_name = null) {
-        $id = Cookie::get($cookie_name ?: static::$login_cookie_name);
-        $token = call_user_func([static::$token_class, "where"], "id", $id)->type("login")->first();
-        if ($token && !$token->is_expired) {
+        /** @var UserToken $token */
+        $token = call_user_func([static::$token_class, "getFromCookie"], $cookie_name ?: static::$login_cookie_name);
+        if ($token && !$token->is_expired && $token->type === UserToken::LoginType) {
             return $token;
         }
     }
 
     /**
-     * @param $token
+     * @param UserToken $token
      * @param string|null $cookie_name
-     * @return bool
      */
     public static function setLoginToken($token, $cookie_name = null) {
-        $cookie = Cookie::forever($cookie_name ?: static::$login_cookie_name, $token->id);
-        Cookie::queue($cookie);
-        return true;
+        if ($token) {
+            $token->setCookie($cookie_name ?: static::$login_cookie_name);
+        }
     }
 
     /**
      * @param string|null $cookie_name
      * @return bool
+     * @throws Exception
      */
     public static function removeLoginToken($cookie_name = null) {
+        $token = call_user_func([static::$token_class, "getFromCookie"], $cookie_name ?: static::$login_cookie_name);
+        if ($token) {
+            $token->delete();
+        }
         Cookie::queue(Cookie::forget($cookie_name ?: static::$login_cookie_name));
         return true;
     }
