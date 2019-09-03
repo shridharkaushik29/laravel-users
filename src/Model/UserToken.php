@@ -8,9 +8,9 @@
 
 namespace Shridhar\Users\Model;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cookie;
 
@@ -122,7 +122,7 @@ abstract class UserToken extends Model {
      * @return mixed
      */
     function getMeta($key) {
-        return array_get($this->meta, $key);
+        return Arr::get($this->meta, $key);
     }
 
     /**
@@ -132,7 +132,7 @@ abstract class UserToken extends Model {
      */
     function setMeta($key, $value) {
         $meta = $this->meta;
-        array_set($meta, $key, $value);
+        Arr::set($meta, $key, $value);
         $this->meta = $meta;
         return $this;
     }
@@ -150,7 +150,7 @@ abstract class UserToken extends Model {
 
     /**
      * @param string $cookie_name
-     * @return UserToken|null
+     * @return UserToken|void
      */
     static function getFromCookie($cookie_name) {
         $id = Cookie::get($cookie_name);

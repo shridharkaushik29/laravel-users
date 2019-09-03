@@ -8,16 +8,17 @@
 
 namespace Shridhar\Users\Model;
 
+use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
-use Exception;
 
 /**
  * Description of User
@@ -62,14 +63,14 @@ abstract class User extends Model {
             "login_time" => static::$login_time,
         ])->merge($config)->toArray();
 
-        $cookie_name = array_get($options, "cookie_name");
-        $login_time = array_get($options, "login_time");
+        $cookie_name = Arr::get($options, "cookie_name");
+        $login_time = Arr::get($options, "login_time");
 
         /** @var UserToken $token */
         $token = static::getLoginToken($cookie_name) ?: $token = $this->tokens()->make();
 
-        $token->ip_address = array_get($options, "ip_address");
-        $token->user_agent = array_get($options, "user_agent");
+        $token->ip_address = Arr::get($options, "ip_address");
+        $token->user_agent = Arr::get($options, "user_agent");
         $token->expiry = Carbon::now()->addSeconds($login_time);
         $token->type = UserToken::LoginType;
         $token->user()->associate($this);
@@ -245,7 +246,7 @@ abstract class User extends Model {
 
     /**
      * @param null $cookie_name
-     * @return User
+     * @return User|void
      */
     public static function loggedInUser($cookie_name = null) {
         $token = static::getLoginToken($cookie_name);
@@ -256,7 +257,7 @@ abstract class User extends Model {
 
     /**
      * @param null $cookie_name
-     * @return User
+     * @return User|void
      */
     public static function currentUser($cookie_name = null) {
         $token = static::getLoginToken($cookie_name);
