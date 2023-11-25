@@ -3,7 +3,7 @@
   "description": "User Management of Laravel",
   "license": "MIT",
   "autoload": {
-    "psr-0": {
+    "psr-4": {
       "Shridhar\\Users\\": "src/"
     }
   },
