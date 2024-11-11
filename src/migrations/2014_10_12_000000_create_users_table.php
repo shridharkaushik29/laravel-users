@@ -15,14 +15,14 @@ class CreateUsersTable extends Migration {
     public function up() {
 
         Schema::create('roles', function (Blueprint $table) {
-            $table->increments('id');
+            $table->id();
             $table->string('slug')->nullable()->unique();
             $table->string('name');
             $table->timestamps();
         });
 
         Schema::create("users", function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->id();
             $table->string("role_id")->nullable();
             $table->string("name")->nullable();
             $table->string("username")->nullable()->unique();
@@ -33,7 +33,7 @@ class CreateUsersTable extends Migration {
         });
 
         Schema::create("user_tokens", function (Blueprint $table) {
-            $table->bigIncrements("id");
+            $table->id();
             $table->bigInteger("user_id")->nullable()->unsigned();
             $table->string("type")->nullable();
             $table->timestamp("expiry")->nullable();
